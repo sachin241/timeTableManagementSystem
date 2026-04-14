@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AI Timetable Scheduler{% endblock %}</title>
+  <meta name="description"
+    content="AI-powered multi-class timetable generation — upload, configure, and generate conflict-free schedules." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'scheduler/style.css' %}" />
+</head>
+
+<body>
+  <div class="app-wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">⏱</span>
+        <span class="logo-text">TimetableAI</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="{% url 'index' %}" class="nav-item {% block nav_home %}{% endblock %}">
+          <span class="nav-icon">🏠</span> Home
+        </a>
+        <a href="{% url 'timetable' %}" class="nav-item {% block nav_timetable %}{% endblock %}">
+          <span class="nav-icon">📅</span> Timetable
+        </a>
+        <a href="{% url 'dashboard' %}" class="nav-item {% block nav_dashboard %}{% endblock %}">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/admin/" class="nav-item" target="_blank">
+          <span class="nav-icon">⚙️</span> Admin
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="version-badge">v4.0.0</span>
+      </div>
+    </aside>
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+  {% load static %}
+  <script src="{% static 'scheduler/app.js' %}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

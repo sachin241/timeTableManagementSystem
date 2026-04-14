@@ -1,0 +1,15 @@
+subject,teacher,hours_per_week,type,section
+Mathematics,Mr. Sharma,5,theory,CSE-A
+Physics,Ms. Patel,4,theory,CSE-A
+Chemistry,Mr. Khan,4,theory,CSE-A
+English,Ms. Verma,3,theory,CSE-A
+Computer Science,Mr. Iyer,4,theory,CSE-A
+History,Ms. Nair,2,theory,CSE-A
+Mathematics,Mr. Sharma,5,theory,CSE-B
+Physics,Ms. Patel,4,theory,CSE-B
+Chemistry,Mr. Khan,4,theory,CSE-B
+English,Ms. Verma,3,theory,CSE-B
+Computer Science,Mr. Iyer,4,theory,CSE-B
+History,Ms. Nair,2,theory,CSE-B
+Physics Lab,Ms. Patel,2,lab,CSE-A
+Chemistry Lab,Mr. Khan,2,lab,CSE-B

@@ -1,0 +1,84 @@
+{% extends 'scheduler/base.html' %}
+{% load static %}
+{% block title %}Timetable — TimetableAI{% endblock %}
+{% block nav_timetable %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">📅 Generated Timetable</h1>
+        <p class="page-sub" id="timetable-summary">Loading schedule data…</p>
+    </div>
+    <div class="header-actions">
+        <button class="btn btn-outline" id="edit-toggle">✏️ Edit Mode</button>
+        <a href="{% url 'index' %}" class="btn btn-outline">← Upload New</a>
+        <a href="{% url 'download_pdf' %}" class="btn btn-gradient" id="pdf-btn">⬇ PDF</a>
+        <a href="{% url 'download_xlsx' %}" class="btn btn-gradient" id="xlsx-btn">⬇ XLSX</a>
+    </div>
+</div>
+
+<!-- Section Switcher -->
+<div class="section-switcher" id="section-switcher"></div>
+
+<!-- Subject Legend -->
+<div class="legend-bar" id="legend-bar"></div>
+
+<!-- Timetable Grid -->
+<div class="table-wrap" id="table-wrap">
+    <div class="loading-state" id="loading-state">
+        <div class="spinner"></div>
+        <p>Fetching timetable…</p>
+    </div>
+    <div class="empty-state hidden" id="empty-state">
+        <p class="empty-icon">🗓</p>
+        <h3>No Timetable Yet</h3>
+        <p>Upload a file and generate a timetable first.</p>
+        <a href="{% url 'index' %}" class="btn btn-primary mt-12">Go to Upload</a>
+    </div>
+    <div class="grid-container hidden" id="grid-container">
+        <table class="timetable-grid" id="timetable-table">
+            <thead id="grid-head"></thead>
+            <tbody id="grid-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-grid hidden" id="summary-grid"></div>
+
+<!-- Edit Modal (hidden by default) -->
+<div class="edit-modal hidden" id="edit-modal">
+    <div class="edit-modal-content">
+        <h3>Edit Entry</h3>
+        <div class="edit-field">
+            <label>Subject</label>
+            <select id="edit-subject"></select>
+        </div>
+        <div class="edit-field">
+            <label>Teacher</label>
+            <select id="edit-teacher"></select>
+        </div>
+        <p class="edit-validation" id="edit-validation"></p>
+        <div class="edit-actions">
+            <button class="btn btn-primary" id="edit-save">Save</button>
+            <button class="btn btn-outline" id="edit-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Explanation Tooltip (v4) -->
+<div class="explain-tooltip hidden" id="explain-tooltip">
+    <div class="explain-header">
+        <span class="explain-title" id="explain-title">🧠 Why this slot?</span>
+        <button class="explain-close" id="explain-close">✕</button>
+    </div>
+    <div class="explain-body" id="explain-body">Loading…</div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => fetchTimetable());
+</script>
+{% endblock %}

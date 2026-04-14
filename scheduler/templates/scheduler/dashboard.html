@@ -1,0 +1,63 @@
+{% extends 'scheduler/base.html' %}
+{% load static %}
+{% block title %}Teacher Dashboard — TimetableAI{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">📊 Teacher Load Dashboard</h1>
+        <p class="page-sub" id="dash-summary">Loading teacher data…</p>
+    </div>
+</div>
+
+<!-- Stats Banner -->
+<div class="dash-stats" id="dash-stats">
+    <div class="dash-stat-card">
+        <span class="dash-stat-label">Teachers</span>
+        <span class="dash-stat-value" id="ds-teachers">—</span>
+    </div>
+    <div class="dash-stat-card">
+        <span class="dash-stat-label">Total Slots</span>
+        <span class="dash-stat-value" id="ds-slots">—</span>
+    </div>
+    <div class="dash-stat-card">
+        <span class="dash-stat-label">Sections</span>
+        <span class="dash-stat-value" id="ds-sections">—</span>
+    </div>
+    <div class="dash-stat-card accent">
+        <span class="dash-stat-label">Overloaded</span>
+        <span class="dash-stat-value" id="ds-overloaded">—</span>
+    </div>
+</div>
+
+<!-- Teacher Load Table -->
+<div class="table-wrap">
+    <div class="loading-state" id="dash-loading">
+        <div class="spinner"></div>
+        <p>Loading dashboard…</p>
+    </div>
+    <div class="grid-container hidden" id="dash-table-wrap">
+        <table class="timetable-grid teacher-load-table" id="teacher-table">
+            <thead>
+                <tr>
+                    <th>Teacher</th>
+                    <th>Subjects</th>
+                    <th>Assigned Hours</th>
+                    <th>Max Available</th>
+                    <th>Utilization</th>
+                    <th>Status</th>
+                    <th>Sections</th>
+                </tr>
+            </thead>
+            <tbody id="teacher-tbody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => fetchTeacherLoad());
+</script>
+{% endblock %}

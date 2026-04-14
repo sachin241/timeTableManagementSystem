@@ -1,0 +1,167 @@
+{% extends 'scheduler/base.html' %}
+{% load static %}
+{% block title %}Upload & Generate — TimetableAI{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="hero-badge">✨ AI-Powered · v3 — Multi-Class</div>
+    <h1 class="hero-title">Smart Timetable Generator</h1>
+    <p class="hero-sub">Upload your data, configure your schedule, and generate conflict-free timetables for multiple
+        classes.</p>
+</div>
+
+<div class="cards-row">
+    <!-- Step 1: Upload -->
+    <div class="card" id="upload-card">
+        <div class="card-step">01</div>
+        <h2 class="card-title">Upload Data</h2>
+        <p class="card-desc">Upload CSV, XLSX, PDF, or DOCX with subjects, teachers, and hours.</p>
+
+        <div class="drop-zone" id="drop-zone">
+            <div class="drop-icon">📂</div>
+            <p class="drop-text">Drag & drop your file here</p>
+            <p class="drop-sub">or</p>
+            <label for="csv-input" class="btn btn-outline">Browse File</label>
+            <input type="file" id="csv-input" accept=".csv,.xlsx,.pdf,.docx" hidden />
+            <p class="file-name" id="file-name">No file selected</p>
+        </div>
+
+        <button class="btn btn-primary full-width" id="upload-btn" disabled>
+            <span class="btn-text">Upload & Parse</span>
+            <span class="btn-spinner" hidden>⟳</span>
+        </button>
+
+        <div class="parse-stats hidden" id="parse-stats">
+            <div class="stat-item"><span class="stat-label">Subjects</span><span class="stat-value"
+                    id="stat-subjects">—</span></div>
+            <div class="stat-item"><span class="stat-label">Teachers</span><span class="stat-value"
+                    id="stat-teachers">—</span></div>
+            <div class="stat-item"><span class="stat-label">Total Hours</span><span class="stat-value"
+                    id="stat-hours">—</span></div>
+            <div class="stat-item"><span class="stat-label">Labs</span><span class="stat-value" id="stat-labs">—</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">Sections</span><span class="stat-value"
+                    id="stat-sections">—</span></div>
+        </div>
+    </div>
+
+    <!-- Step 2: Configure + Generate -->
+    <div class="card" id="generate-card">
+        <div class="card-step">02</div>
+        <h2 class="card-title">Configure & Generate</h2>
+        <p class="card-desc">Customise time slots, then let the AI scheduler build timetables for all sections.</p>
+
+        <!-- Config Panel -->
+        <details class="config-panel" id="config-panel">
+            <summary class="config-toggle">⚙️ Schedule Configuration <span class="config-hint">(click to expand)</span>
+            </summary>
+            <div class="config-grid">
+                <div class="config-field">
+                    <label for="cfg-start">Start Time</label>
+                    <input type="time" id="cfg-start" value="{{ default_start }}" />
+                </div>
+                <div class="config-field">
+                    <label for="cfg-end">End Time</label>
+                    <input type="time" id="cfg-end" value="{{ default_end }}" />
+                </div>
+                <div class="config-field">
+                    <label for="cfg-duration">Slot Duration (min)</label>
+                    <input type="number" id="cfg-duration" value="{{ default_duration }}" min="15" max="180" step="5" />
+                </div>
+                <div class="config-field">
+                    <label for="cfg-break-start">Break Start</label>
+                    <input type="time" id="cfg-break-start" value="{{ default_break_start }}" />
+                </div>
+                <div class="config-field">
+                    <label for="cfg-break-end">Break End</label>
+                    <input type="time" id="cfg-break-end" value="{{ default_break_end }}" />
+                </div>
+                <div class="config-field full-col">
+                    <label>Working Days</label>
+                    <div class="days-grid" id="days-grid">
+                        {% for day in days_list %}
+                        <label class="day-chip {% if day in default_days_set %}selected{% endif %}">
+                            <input type="checkbox" value="{{ day }}" {% if day in default_days_set %}checked{% endif %}
+                                hidden />
+                            {{ day|slice:":3" }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <p class="config-preview" id="config-preview">Calculating slots…</p>
+        </details>
+
+        <div class="algo-info">
+            <div class="algo-item">🔒 <strong>HC1:</strong> No teacher double-booked (global)</div>
+            <div class="algo-item">🔒 <strong>HC2:</strong> Exact hours per subject</div>
+            <div class="algo-item">🔒 <strong>HC4:</strong> Labs get consecutive slots</div>
+            <div class="algo-item">💡 <strong>SC1-3:</strong> Balanced distribution</div>
+            <div class="algo-item">⚡ <strong>MRV:</strong> Priority heuristic</div>
+        </div>
+
+        <button class="btn btn-gradient full-width" id="generate-btn" disabled>
+            <span class="btn-text">⚡ Generate Timetables</span>
+            <span class="btn-spinner" hidden>⟳</span>
+        </button>
+
+        <div class="gen-result hidden" id="gen-result">
+            <p id="gen-message" class="gen-message"></p>
+            <a href="{% url 'timetable' %}" class="btn btn-primary full-width mt-12">View Timetable →</a>
+        </div>
+    </div>
+</div>
+
+<!-- Format Reference -->
+<div class="card info-card">
+    <h2 class="card-title">📋 Input Format Reference <span class="badge-new">v3</span></h2>
+    <p class="card-desc">Supported: <strong>CSV, XLSX, PDF, DOCX</strong>. Time slots are generated automatically.</p>
+
+    <h3 class="ref-subtitle">CSV / XLSX (columnar)</h3>
+    <div class="csv-table-wrap">
+        <table class="csv-ref-table">
+            <thead>
+                <tr>
+                    <th>subject</th>
+                    <th>teacher</th>
+                    <th>hours_per_week</th>
+                    <th>type <em>(opt)</em></th>
+                    <th>section <em>(opt)</em></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mathematics</td>
+                    <td>Mr. Sharma</td>
+                    <td>5</td>
+                    <td>theory</td>
+                    <td>CSE-A</td>
+                </tr>
+                <tr>
+                    <td>Physics Lab</td>
+                    <td>Ms. Patel</td>
+                    <td>2</td>
+                    <td>lab</td>
+                    <td>CSE-A</td>
+                </tr>
+                <tr>
+                    <td>Mathematics</td>
+                    <td>Mr. Sharma</td>
+                    <td>5</td>
+                    <td>theory</td>
+                    <td>CSE-B</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="card-desc mt-12"><em>Optional:</em> Use <code>credits</code> column instead of
+        <code>hours_per_week</code>. Theory: 1 credit = 1h, Lab: 1 credit = 2h.</p>
+
+    <h3 class="ref-subtitle mt-12">PDF / DOCX (line-based)</h3>
+    <pre class="code-block">Mr. Sharma - Mathematics - 5
+Ms. Patel - Physics Lab - 2 - lab - CSE-A</pre>
+
+    <a href="/media/uploads/sample_input.csv" class="btn btn-outline mt-12" download>⬇ Download Sample CSV</a>
+</div>
+{% endblock %}
