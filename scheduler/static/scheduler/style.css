@@ -285,6 +285,13 @@ body {
   background: rgba(99, 102, 241, 0.12);
 }
 
+.room-pool {
+  display: grid;
+  grid-template-columns: 1.6fr 1.1fr 0.8fr;
+  gap: 12px;
+  margin: 16px 0 18px;
+}
+
 .drop-icon {
   font-size: 36px;
   margin-bottom: 8px;
@@ -826,7 +833,8 @@ body {
 }
 
 .config-field input[type="time"],
-.config-field input[type="number"] {
+.config-field input[type="number"],
+.config-field input[type="text"] {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -842,6 +850,10 @@ body {
 .config-field input:focus {
   border-color: var(--accent);
   background: rgba(99, 102, 241, 0.08);
+}
+
+.config-field input::placeholder {
+  color: rgba(153, 153, 187, 0.7);
 }
 
 /* Chrome time/number appearance fix for dark theme */
@@ -1386,5 +1398,11 @@ body.edit-mode-active .filled-slot:hover::after {
   .page-header {
     flex-direction: column;
     gap: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .room-pool {
+    grid-template-columns: 1fr;
   }
 }

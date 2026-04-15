@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Django / app runtime
+db.sqlite3
+staticfiles/
+media/uploads/*
+!media/uploads/sample_input.csv
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

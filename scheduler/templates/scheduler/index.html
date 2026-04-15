@@ -16,7 +16,7 @@
     <div class="card" id="upload-card">
         <div class="card-step">01</div>
         <h2 class="card-title">Upload Data</h2>
-        <p class="card-desc">Upload CSV, XLSX, PDF, or DOCX with subjects, teachers, and hours.</p>
+        <p class="card-desc">Upload CSV, XLSX, PDF, or DOCX with subjects, teachers, hours, and optional room pool info.</p>
 
         <div class="drop-zone" id="drop-zone">
             <div class="drop-icon">📂</div>
@@ -25,6 +25,21 @@
             <label for="csv-input" class="btn btn-outline">Browse File</label>
             <input type="file" id="csv-input" accept=".csv,.xlsx,.pdf,.docx" hidden />
             <p class="file-name" id="file-name">No file selected</p>
+        </div>
+
+        <div class="room-pool">
+            <div class="config-field">
+                <label for="room-names">Available Rooms</label>
+                <input type="text" id="room-names" placeholder="Room 101, Room 102, Lab 1" />
+            </div>
+            <div class="config-field">
+                <label for="lab-room-names">Lab Rooms</label>
+                <input type="text" id="lab-room-names" placeholder="Lab 1, Lab 2" />
+            </div>
+            <div class="config-field">
+                <label for="room-count">Auto-Generate Rooms</label>
+                <input type="number" id="room-count" value="0" min="0" step="1" />
+            </div>
         </div>
 
         <button class="btn btn-primary full-width" id="upload-btn" disabled>
@@ -40,6 +55,8 @@
             <div class="stat-item"><span class="stat-label">Total Hours</span><span class="stat-value"
                     id="stat-hours">—</span></div>
             <div class="stat-item"><span class="stat-label">Labs</span><span class="stat-value" id="stat-labs">—</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">Rooms</span><span class="stat-value" id="stat-rooms">—</span>
             </div>
             <div class="stat-item"><span class="stat-label">Sections</span><span class="stat-value"
                     id="stat-sections">—</span></div>
@@ -96,9 +113,9 @@
         <div class="algo-info">
             <div class="algo-item">🔒 <strong>HC1:</strong> No teacher double-booked (global)</div>
             <div class="algo-item">🔒 <strong>HC2:</strong> Exact hours per subject</div>
-            <div class="algo-item">🔒 <strong>HC4:</strong> Labs get consecutive slots</div>
-            <div class="algo-item">💡 <strong>SC1-3:</strong> Balanced distribution</div>
-            <div class="algo-item">⚡ <strong>MRV:</strong> Priority heuristic</div>
+            <div class="algo-item">🔒 <strong>HC4:</strong> 6 periods per day</div>
+            <div class="algo-item">💡 <strong>SC1-3:</strong> Balanced, mixed distribution</div>
+            <div class="algo-item">⚡ <strong>MRV:</strong> Priority heuristic with randomness</div>
         </div>
 
         <button class="btn btn-gradient full-width" id="generate-btn" disabled>
@@ -157,6 +174,7 @@
     </div>
     <p class="card-desc mt-12"><em>Optional:</em> Use <code>credits</code> column instead of
         <code>hours_per_week</code>. Theory: 1 credit = 1h, Lab: 1 credit = 2h.</p>
+    <p class="card-desc">If your file does not include room data, enter room names in the upload card and the scheduler will allocate them automatically.</p>
 
     <h3 class="ref-subtitle mt-12">PDF / DOCX (line-based)</h3>
     <pre class="code-block">Mr. Sharma - Mathematics - 5

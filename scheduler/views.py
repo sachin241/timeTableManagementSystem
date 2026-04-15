@@ -71,6 +71,21 @@ def _parse_config_from_body(body):
     return config
 
 
+def _parse_room_config_from_body(body):
+    room_names = body.get("room_names", "")
+    lab_room_names = body.get("lab_room_names", "")
+    room_count = body.get("room_count", "")
+
+    if not any([room_names, lab_room_names, room_count]):
+        return None
+
+    return {
+        "room_names": room_names,
+        "lab_room_names": lab_room_names,
+        "room_count": room_count,
+    }
+
+
 def _slot_label(slot):
     return f"{slot.start_time.strftime('%H:%M')}–{slot.end_time.strftime('%H:%M')}"
 
@@ -176,12 +191,15 @@ def upload_file(request):
             f.write(chunk)
 
     try:
-        data = parse_and_store(file_path)
+        room_config = _parse_room_config_from_body(request.POST.dict())
+        data = parse_and_store(file_path, room_inventory=room_config)
         request.session["upload_path"] = file_path
+        request.session["room_inventory"] = room_config or {}
 
         total_hours = sum(data["subject_hours_map"].values())
         labs = [s for s in data["subjects"] if getattr(s, "subject_type", "theory") == "lab"]
         sections = [s.name for s in data["sections"]]
+        room_names = [room.name for room in data.get("rooms", [])]
 
         return JsonResponse(
             {
@@ -190,6 +208,7 @@ def upload_file(request):
                 "subjects": len(data["subjects"]),
                 "teachers": len(data["teachers"]),
                 "rooms": len(data.get("rooms", [])),
+                "room_names": room_names,
                 "total_hours": total_hours,
                 "labs_count": len(labs),
                 "sections": sections,
@@ -219,8 +238,9 @@ def generate(request):
 
     try:
         config = _parse_config_from_body(body)
+        room_config = _parse_room_config_from_body(body) or request.session.get("room_inventory")
 
-        data = parse_and_store(upload_path)
+        data = parse_and_store(upload_path, room_inventory=room_config)
 
         slot_dicts = generate_time_slots(config)
         if not slot_dicts:
@@ -284,6 +304,7 @@ def timetable_view(request):
 def api_timetable(request):
     requested = request.GET.get("section", "").strip()
     all_sections = list(ClassSection.objects.values_list("name", flat=True))
+    slot_days = list(TimeSlot.objects.values_list("day", flat=True).distinct())
 
     entries = Timetable.objects.select_related("subject", "teacher", "room", "time_slot", "section")
 
@@ -343,7 +364,7 @@ def api_timetable(request):
         subject_count[entry.subject.name] = subject_count.get(entry.subject.name, 0) + 1
 
     sorted_labels = [label for _, label in sorted(slot_labels_set)]
-    active_days = [d for d in DAY_ORDER if d in grid]
+    active_days = [d for d in DAY_ORDER if d in slot_days]
 
     return JsonResponse(
         {
@@ -395,12 +416,6 @@ def api_edit(request):
     if new_subject not in new_teacher.subjects.all():
         return JsonResponse(
             {"success": False, "error": f"{new_teacher.name} cannot teach {new_subject.name}."},
-            status=409,
-        )
-
-    if new_subject.subject_type == "lab" and new_room and not new_room.is_lab:
-        return JsonResponse(
-            {"success": False, "error": f"Lab subject {new_subject.name} requires a lab room."},
             status=409,
         )
 
@@ -486,14 +501,6 @@ def api_validate(request):
             {
                 "valid": False,
                 "conflicts": [f"{new_teacher.name} cannot teach {entry.subject.name}."],
-            }
-        )
-
-    if entry.subject.subject_type == "lab" and new_room and not new_room.is_lab:
-        return JsonResponse(
-            {
-                "valid": False,
-                "conflicts": [f"Lab subject {entry.subject.name} requires a lab room."],
             }
         )
 
@@ -613,7 +620,8 @@ def api_debug_schedule(request):
     body = _json_body(request)
     try:
         config = _parse_config_from_body(body)
-        data = parse_and_store(upload_path)
+        room_config = _parse_room_config_from_body(body) or request.session.get("room_inventory")
+        data = parse_and_store(upload_path, room_inventory=room_config)
         slot_dicts = generate_time_slots(config)
         orm_slots = persist_time_slots(slot_dicts)
         reports = debug_schedule(data, orm_slots)
@@ -700,15 +708,6 @@ def api_partial_regen(request):
                     status=409,
                 )
 
-            if entry.subject.subject_type == "lab" and not new_room.is_lab:
-                return JsonResponse(
-                    {
-                        "success": False,
-                        "error": "Lab subject requires a lab room.",
-                    },
-                    status=409,
-                )
-
             entry.room = new_room
             entry.save()
             result.setdefault("changed", []).append(
@@ -745,6 +744,7 @@ def download_pdf(request):
     if not entries.exists():
         raise Http404("No timetable data found.")
 
+    slot_days = list(TimeSlot.objects.values_list("day", flat=True).distinct())
     sections_data = {}
     for entry in entries:
         sections_data.setdefault(entry.section.name, []).append(entry)
@@ -774,7 +774,7 @@ def download_pdf(request):
             grid.setdefault(slot.day, {})[label] = text
 
         sorted_labels = [v for _, v in sorted(slot_set.items())]
-        active_days = [d for d in DAY_ORDER if d in grid]
+        active_days = [d for d in DAY_ORDER if d in slot_days]
 
         header = ["Time Slot"] + active_days
         table_data = [header]
@@ -836,6 +836,7 @@ def download_xlsx(request):
     if not entries.exists():
         raise Http404("No timetable data found.")
 
+    slot_days = list(TimeSlot.objects.values_list("day", flat=True).distinct())
     sections_data = {}
     for entry in entries:
         sections_data.setdefault(entry.section.name, []).append(entry)
@@ -869,7 +870,7 @@ def download_xlsx(request):
             grid.setdefault(slot.day, {})[label] = f"{e.subject.name}{tag}{room_txt}\n{e.teacher.name}"
 
         sorted_labels = [v for _, v in sorted(slot_set.items())]
-        active_days = [d for d in DAY_ORDER if d in grid]
+        active_days = [d for d in DAY_ORDER if d in slot_days]
 
         headers = ["Time Slot"] + active_days
         for col_idx, hdr in enumerate(headers, 1):

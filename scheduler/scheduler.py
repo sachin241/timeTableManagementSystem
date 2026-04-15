@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import time as dt_time
 from math import inf
+import random
 
 
 # ---------------------------------------------------------------------
@@ -54,9 +55,12 @@ def generate_time_slots(config: dict = None) -> list:
     start_min = _time_to_minutes(_str_to_time(cfg["start_time"]))
     end_min = _time_to_minutes(_str_to_time(cfg["end_time"]))
     duration = int(cfg["slot_duration"])
+    periods_per_day = int(cfg.get("periods_per_day", 6))
 
     if duration <= 0:
         raise ValueError("slot_duration must be a positive integer.")
+    if periods_per_day <= 0:
+        raise ValueError("periods_per_day must be a positive integer.")
     if start_min >= end_min:
         raise ValueError("start_time must be earlier than end_time.")
 
@@ -70,7 +74,7 @@ def generate_time_slots(config: dict = None) -> list:
         current = start_min
         slot_idx = 0
 
-        while current + duration <= end_min:
+        while current + duration <= end_min and slot_idx < periods_per_day:
             slot_end = current + duration
 
             if break_start_min is not None and break_end_min is not None:
@@ -88,6 +92,12 @@ def generate_time_slots(config: dict = None) -> list:
             )
             current = slot_end
             slot_idx += 1
+
+        if slot_idx < periods_per_day:
+            raise ValueError(
+                f"Configuration for {day} only produced {slot_idx} period(s); "
+                f"{periods_per_day} periods/day are required."
+            )
 
     return slots
 
@@ -185,6 +195,11 @@ class BaseScheduler(ABC):
             self.section_subjects = section_subjects
             self.subjects = [self.all_subjects[si["subject_id"]] for si in section_subjects]
             self.subject_hours_map = {si["subject_id"]: si["hours"] for si in section_subjects}
+            self.section_teacher_map = {
+                si["subject_id"]: self.all_teachers.get(si["teacher_id"])
+                for si in section_subjects
+                if si.get("teacher_id") in self.all_teachers
+            }
             self.preferred_room_map = {
                 si["subject_id"]: si.get("room_id")
                 for si in section_subjects
@@ -193,14 +208,17 @@ class BaseScheduler(ABC):
         else:
             self.subjects = data["subjects"]
             self.subject_hours_map = data["subject_hours_map"]
+            self.section_teacher_map = {}
             self.preferred_room_map = {}
 
-        self.lab_subjects = [s for s in self.subjects if getattr(s, "subject_type", "theory") == "lab"]
-        self.theory_subjects = [s for s in self.subjects if getattr(s, "subject_type", "theory") == "theory"]
+        # Treat labs the same as regular classes during auto-generation.
+        self.lab_subjects = []
+        self.theory_subjects = list(self.subjects)
 
         self.global_teacher_busy = global_teacher_busy if global_teacher_busy is not None else defaultdict(set)
         self.global_room_busy = global_room_busy if global_room_busy is not None else defaultdict(set)
 
+        self.rng = random.Random()
         self.teacher_hours_used = defaultdict(int)
 
         self.assignments = {}   # slot_id -> (subject, teacher, room, is_lab_continuation)
@@ -213,8 +231,8 @@ class BaseScheduler(ABC):
     def _candidate_rooms(self, subject):
         rooms = list(self.all_rooms.values())
 
-        if getattr(subject, "subject_type", "theory") == "lab":
-            rooms = [r for r in rooms if getattr(r, "is_lab", False)]
+        if not rooms:
+            return [None]
 
         preferred_room_id = self.preferred_room_map.get(subject.id)
         if preferred_room_id and preferred_room_id in self.all_rooms:
@@ -229,6 +247,69 @@ class BaseScheduler(ABC):
         if limit is None:
             return True
         return self.teacher_hours_used[teacher.id] + extra_hours <= limit
+
+    def _teacher_for_subject(self, subject):
+        teacher = self.section_teacher_map.get(subject.id)
+        if teacher is not None:
+            return teacher
+        return self.subject_teacher_map.get(subject.id)
+
+    def _spread_slots(self, slots):
+        """
+        Return slots in a more mixed order so the schedule does not fill
+        one day or one time band first.
+        """
+        slots_by_day = defaultdict(list)
+        for slot in slots:
+            slots_by_day[slot.day].append(slot)
+
+        for day_slots in slots_by_day.values():
+            day_slots.sort(key=lambda s: (s.slot_index, s.start_time))
+
+        day_order = list(slots_by_day.keys())
+        self.rng.shuffle(day_order)
+
+        max_len = max((len(v) for v in slots_by_day.values()), default=0)
+        ordered = []
+        for idx in range(max_len):
+            shuffled_days = day_order[:]
+            self.rng.shuffle(shuffled_days)
+            for day in shuffled_days:
+                day_slots = slots_by_day[day]
+                if idx < len(day_slots):
+                    ordered.append(day_slots[idx])
+
+        return ordered
+
+    def _slot_priority(self, slot, remaining, day_schedule):
+        """
+        Lower values get scheduled first. We favor emptier days and then
+        add a small random jitter so the grid does not look rigid.
+        """
+        return (
+            len(day_schedule.get(slot.day, [])),
+            slot.slot_index,
+            self.rng.random(),
+        )
+
+    def _choose_next_slot(self, free_slots, day_schedule):
+        """
+        Pick the next slot from the remaining pool instead of walking the
+        timetable in a fixed left-to-right order.
+        """
+        if not free_slots:
+            return None
+
+        scored = []
+        for slot in free_slots:
+            day_load = len(day_schedule.get(slot.day, []))
+            # Prefer emptier days and then mix in the period number plus jitter.
+            score = (day_load * 10) + (slot.slot_index * 1.5) + self.rng.uniform(0.0, 4.0)
+            scored.append((score, slot))
+
+        scored.sort(key=lambda item: item[0])
+        shortlist = [slot for _, slot in scored[: min(4, len(scored))]]
+        return self.rng.choice(shortlist)
 
     def save(self, section_name: str = "A"):
         """
@@ -278,8 +359,7 @@ class BacktrackingScheduler(BaseScheduler):
       - room clash
       - section clash (enforced by Timetable unique constraint)
       - teacher max hours
-      - labs only in lab rooms
-      - labs placed in consecutive slots
+      - balanced spreading across the week
     """
 
     def run(self) -> bool:
@@ -297,13 +377,9 @@ class BacktrackingScheduler(BaseScheduler):
         local_room_busy = defaultdict(set)
         used_slots = set()
 
-        if not self._schedule_labs(remaining, day_schedule, local_teacher_busy, local_room_busy, used_slots):
-            return False
-
         free_slots = [s for s in self.slots if s.id not in used_slots]
 
         return self._backtrack(
-            slot_index=0,
             free_slots=free_slots,
             remaining=remaining,
             day_schedule=day_schedule,
@@ -327,7 +403,7 @@ class BacktrackingScheduler(BaseScheduler):
             )
 
         for subject in self.subjects:
-            teacher = self.subject_teacher_map.get(subject.id)
+            teacher = self._teacher_for_subject(subject)
             if not teacher:
                 report.constraint_violations.append(f"No teacher assigned for '{subject.name}'")
                 continue
@@ -350,20 +426,8 @@ class BacktrackingScheduler(BaseScheduler):
         local_room_busy = defaultdict(set)
         used_slots = set()
 
-        try:
-            self._schedule_labs(
-                remaining,
-                day_schedule,
-                local_teacher_busy,
-                local_room_busy,
-                used_slots,
-            )
-        except SchedulingError as e:
-            report.constraint_violations.append(f"Lab scheduling: {str(e)}")
-
         free_slots = [s for s in self.slots if s.id not in used_slots]
         success = self._backtrack(
-            slot_index=0,
             free_slots=free_slots,
             remaining=remaining,
             day_schedule=day_schedule,
@@ -387,133 +451,24 @@ class BacktrackingScheduler(BaseScheduler):
         return report
 
     # -----------------------------------------------------------------
-    # Lab Scheduling
-    # -----------------------------------------------------------------
-
-    def _schedule_labs(self, remaining, day_schedule, local_teacher_busy, local_room_busy, used_slots) -> bool:
-        for subject in self.lab_subjects:
-            hours_needed = remaining.get(subject.id, 0)
-            if hours_needed <= 0:
-                continue
-
-            teacher = self.subject_teacher_map.get(subject.id)
-            if teacher is None:
-                raise SchedulingError(f"No teacher assigned for lab subject '{subject.name}'.")
-
-            if not self._teacher_can_take(teacher, hours_needed):
-                raise SchedulingError(
-                    f"Teacher '{teacher.name}' cannot take {hours_needed} more lab hours."
-                )
-
-            placed = self._place_lab_block(
-                subject,
-                teacher,
-                hours_needed,
-                day_schedule,
-                local_teacher_busy,
-                local_room_busy,
-                used_slots,
-            )
-            if not placed:
-                raise SchedulingError(
-                    f"Cannot find {hours_needed} consecutive free slots for lab "
-                    f"'{subject.name}'."
-                )
-
-            remaining[subject.id] = 0
-
-        return True
-
-    def _place_lab_block(self, subject, teacher, count, day_schedule, local_teacher_busy, local_room_busy, used_slots) -> bool:
-        room_candidates = self._candidate_rooms(subject)
-        if not room_candidates:
-            raise SchedulingError(f"No lab room available for '{subject.name}'.")
-
-        day_order = sorted(self.slots_by_day.keys(), key=lambda d: len(day_schedule.get(d, [])))
-
-        for day in day_order:
-            day_slots = self.slots_by_day.get(day, [])
-            for i in range(len(day_slots) - count + 1):
-                block = day_slots[i:i + count]
-
-                if any(s.id in used_slots for s in block):
-                    continue
-
-                if any(s.id in self.global_teacher_busy.get(teacher.id, set()) for s in block):
-                    continue
-                if any(s.id in local_teacher_busy.get(teacher.id, set()) for s in block):
-                    continue
-
-                chosen_room = None
-                for room in room_candidates:
-                    room_conflict = False
-                    for s in block:
-                        if s.id in self.global_room_busy.get(room.id, set()):
-                            room_conflict = True
-                            break
-                        if s.id in local_room_busy.get(room.id, set()):
-                            room_conflict = True
-                            break
-                    if not room_conflict:
-                        chosen_room = room
-                        break
-
-                if chosen_room is None:
-                    continue
-
-                for idx, slot in enumerate(block):
-                    is_continuation = idx > 0
-                    self.assignments[slot.id] = (subject, teacher, chosen_room, is_continuation)
-                    used_slots.add(slot.id)
-                    day_schedule[day].append(subject.id)
-
-                    local_teacher_busy[teacher.id].add(slot.id)
-                    self.global_teacher_busy[teacher.id].add(slot.id)
-
-                    local_room_busy[chosen_room.id].add(slot.id)
-                    self.global_room_busy[chosen_room.id].add(slot.id)
-
-                    self.teacher_hours_used[teacher.id] += 1
-
-                    factors = [
-                        f"Lab requires {count} consecutive slots",
-                        f"{teacher.name} was free for all {count} slots",
-                        f"Room {chosen_room.name} was free for the block",
-                        f"No slot conflict on {day}",
-                        f"{day} had fewest assignments (balanced placement)",
-                    ]
-                    if is_continuation:
-                        factors.append(
-                            f"Continuation of {subject.name} lab block (slot {idx + 1}/{count})"
-                        )
-
-                    self.explanations[slot.id] = {
-                        "reason": f"Lab '{subject.name}' placed in consecutive block on {day}",
-                        "factors": factors,
-                        "sc_score": 0.0,
-                        "phase": "lab_scheduling",
-                    }
-
-                return True
-
-        return False
-
-    # -----------------------------------------------------------------
     # Theory Scheduling
     # -----------------------------------------------------------------
 
-    def _backtrack(self, slot_index, free_slots, remaining, day_schedule, local_teacher_busy, local_room_busy, used_slots) -> bool:
+    def _backtrack(self, free_slots, remaining, day_schedule, local_teacher_busy, local_room_busy, used_slots) -> bool:
         if all(h == 0 for h in remaining.values()):
             return True
 
-        if slot_index >= len(free_slots):
+        if not free_slots:
             return all(h == 0 for h in remaining.values())
 
-        slot = free_slots[slot_index]
+        slot = self._choose_next_slot(free_slots, day_schedule)
+        if slot is None:
+            return all(h == 0 for h in remaining.values())
+
         candidates = self._get_candidates(slot, remaining, day_schedule, local_teacher_busy)
 
         for subject, sc_score, factors in candidates:
-            teacher = self.subject_teacher_map.get(subject.id)
+            teacher = self._teacher_for_subject(subject)
             if teacher is None:
                 continue
 
@@ -530,7 +485,11 @@ class BacktrackingScheduler(BaseScheduler):
                 continue
 
             chosen_room = None
+            roomless_allowed = False
             for room in room_candidates:
+                if room is None:
+                    roomless_allowed = True
+                    break
                 if slot.id in self.global_room_busy.get(room.id, set()):
                     continue
                 if slot.id in local_room_busy.get(room.id, set()):
@@ -538,7 +497,7 @@ class BacktrackingScheduler(BaseScheduler):
                 chosen_room = room
                 break
 
-            if chosen_room is None:
+            if chosen_room is None and not roomless_allowed:
                 continue
 
             self.assignments[slot.id] = (subject, teacher, chosen_room, False)
@@ -548,8 +507,9 @@ class BacktrackingScheduler(BaseScheduler):
             local_teacher_busy[teacher.id].add(slot.id)
             self.global_teacher_busy[teacher.id].add(slot.id)
 
-            local_room_busy[chosen_room.id].add(slot.id)
-            self.global_room_busy[chosen_room.id].add(slot.id)
+            if chosen_room is not None:
+                local_room_busy[chosen_room.id].add(slot.id)
+                self.global_room_busy[chosen_room.id].add(slot.id)
 
             used_slots.add(slot.id)
             self.teacher_hours_used[teacher.id] += 1
@@ -557,14 +517,13 @@ class BacktrackingScheduler(BaseScheduler):
             hrs_left = remaining[subject.id]
             self.explanations[slot.id] = {
                 "reason": f"MRV selected '{subject.name}' ({hrs_left}h remaining after placement)",
-                "factors": factors + [f"Room selected: {chosen_room.name}"],
+                "factors": factors + ([f"Room selected: {chosen_room.name}"] if chosen_room else ["No room required"]),
                 "sc_score": round(sc_score, 2),
                 "phase": "theory_backtracking",
             }
 
             if self._backtrack(
-                slot_index + 1,
-                free_slots,
+                [s for s in free_slots if s.id not in used_slots],
                 remaining,
                 day_schedule,
                 local_teacher_busy,
@@ -582,15 +541,15 @@ class BacktrackingScheduler(BaseScheduler):
             local_teacher_busy[teacher.id].discard(slot.id)
             self.global_teacher_busy[teacher.id].discard(slot.id)
 
-            local_room_busy[chosen_room.id].discard(slot.id)
-            self.global_room_busy[chosen_room.id].discard(slot.id)
+            if chosen_room is not None:
+                local_room_busy[chosen_room.id].discard(slot.id)
+                self.global_room_busy[chosen_room.id].discard(slot.id)
 
             used_slots.discard(slot.id)
             self.teacher_hours_used[teacher.id] -= 1
 
         return self._backtrack(
-            slot_index + 1,
-            free_slots,
+            [s for s in free_slots if s.id not in used_slots],
             remaining,
             day_schedule,
             local_teacher_busy,
@@ -618,7 +577,7 @@ class BacktrackingScheduler(BaseScheduler):
             if hrs_left <= 0:
                 continue
 
-            teacher = self.subject_teacher_map.get(subject.id)
+            teacher = self._teacher_for_subject(subject)
             if teacher is None:
                 continue
 
@@ -663,10 +622,15 @@ class BacktrackingScheduler(BaseScheduler):
             score += sc4_pen
             factors.append(f"SC4: distribution penalty +{sc4_pen:.1f}")
 
+            # Random jitter to avoid rigid, repeating patterns.
+            jitter = round(self.rng.uniform(0.0, 2.0), 2)
+            score += jitter
+            factors.append(f"Random spread jitter +{jitter:.2f}")
+
             factors.append(f"Total soft score: {score:.1f}")
             factors.append(f"MRV remaining: {hrs_left}")
 
-            candidates.append((-hrs_left, score, subject.name, subject, score, factors))
+            candidates.append((-hrs_left, score, self._slot_priority(slot, remaining, day_schedule), subject, score, factors))
 
         candidates.sort(key=lambda x: (x[0], x[1], x[2]))
         return [(c[3], c[4], c[5]) for c in candidates]

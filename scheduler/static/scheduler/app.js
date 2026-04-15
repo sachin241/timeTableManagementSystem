@@ -58,6 +58,9 @@ function showToast(msg, type = 'success') {
 
     const fd = new FormData();
     fd.append('csv_file', fileInput.files[0]);
+    fd.append('room_names', document.getElementById('room-names')?.value || '');
+    fd.append('lab_room_names', document.getElementById('lab-room-names')?.value || '');
+    fd.append('room_count', document.getElementById('room-count')?.value || '0');
 
     try {
       const res = await fetch('/upload/', { method: 'POST', body: fd });
@@ -71,6 +74,8 @@ function showToast(msg, type = 'success') {
         document.getElementById('stat-hours').textContent = data.total_hours;
         const labsEl = document.getElementById('stat-labs');
         if (labsEl) labsEl.textContent = data.labs_count || 0;
+        const roomsEl = document.getElementById('stat-rooms');
+        if (roomsEl) roomsEl.textContent = `${data.rooms || 0}${data.room_names?.length ? ` (${data.room_names.join(', ')})` : ''}`;
         const secEl = document.getElementById('stat-sections');
         if (secEl) secEl.textContent = (data.sections || ['A']).join(', ');
         genBtn.disabled = false;
@@ -183,6 +188,9 @@ function collectConfig() {
     break_start: document.getElementById('cfg-break-start')?.value || '',
     break_end: document.getElementById('cfg-break-end')?.value || '',
     days: days,
+    room_names: document.getElementById('room-names')?.value || '',
+    lab_room_names: document.getElementById('lab-room-names')?.value || '',
+    room_count: parseInt(document.getElementById('room-count')?.value || '0', 10) || 0,
   };
 }
 

@@ -11,6 +11,8 @@ v4 changes:
 """
 
 import os
+from collections.abc import Iterable
+
 import pandas as pd
 
 from .models import Subject, Teacher, ClassSection, Timetable, Room
@@ -28,7 +30,7 @@ OPTIONAL_COLUMNS = {
 }
 
 
-def parse_and_store(file_path: str) -> dict:
+def parse_and_store(file_path: str, room_inventory: dict | list | None = None) -> dict:
     """
     Parse any supported file and persist Subject + Teacher + ClassSection + Room data.
 
@@ -66,7 +68,7 @@ def parse_and_store(file_path: str) -> dict:
             f"Unsupported file format: '{ext}'. Supported: .csv, .xlsx, .docx, .pdf"
         )
 
-    return _process_dataframe(df)
+    return _process_dataframe(df, room_inventory=room_inventory)
 
 
 def _load_csv(path: str) -> pd.DataFrame:
@@ -196,7 +198,68 @@ def _parse_text_line(line: str) -> dict | None:
     return row
 
 
-def _process_dataframe(df: pd.DataFrame) -> dict:
+def _normalize_room_inventory(room_inventory: dict | list | None) -> list[dict]:
+    """
+    Normalize room data from the UI into a list of room specs.
+
+    Accepted shapes:
+      - {"room_names": "...", "room_count": 2, "lab_room_names": "..."}
+      - [{"name": "Room 101", "is_lab": False}, ...]
+      - ["Room 101", "Room 102"]
+    """
+    if not room_inventory:
+        return []
+
+    specs: list[dict] = []
+
+    if isinstance(room_inventory, dict):
+        room_names = room_inventory.get("room_names", "")
+        lab_room_names = room_inventory.get("lab_room_names", "")
+        room_count = room_inventory.get("room_count", 0)
+
+        lab_name_set = {
+            item.strip().lower()
+            for item in str(lab_room_names).split(",")
+            if str(item).strip()
+        }
+
+        if isinstance(room_names, str):
+            explicit_names = [item.strip() for item in room_names.split(",") if item.strip()]
+        elif isinstance(room_names, Iterable):
+            explicit_names = [str(item).strip() for item in room_names if str(item).strip()]
+        else:
+            explicit_names = []
+
+        for name in explicit_names:
+            specs.append({"name": name, "is_lab": name.lower() in lab_name_set or "lab" in name.lower()})
+
+        try:
+            count = int(room_count or 0)
+        except (TypeError, ValueError):
+            count = 0
+
+        for idx in range(1, count + 1):
+            generated_name = f"Room {idx}"
+            specs.append({"name": generated_name, "is_lab": False})
+
+        return specs
+
+    if isinstance(room_inventory, Iterable) and not isinstance(room_inventory, (str, bytes)):
+        for item in room_inventory:
+            if isinstance(item, str):
+                name = item.strip()
+                if name:
+                    specs.append({"name": name, "is_lab": "lab" in name.lower()})
+            elif isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                if not name:
+                    continue
+                specs.append({"name": name, "is_lab": bool(item.get("is_lab", False))})
+
+    return specs
+
+
+def _process_dataframe(df: pd.DataFrame, room_inventory: dict | list | None = None) -> dict:
     """
     Normalize the dataframe and write records to DB.
     """
@@ -296,17 +359,25 @@ def _process_dataframe(df: pd.DataFrame) -> dict:
 
     # Rooms
     room_map = {}
-    room_names = sorted([r for r in df["room"].unique().tolist() if r])
-    for rname in room_names:
+    room_specs = {}
+
+    for rname in sorted([r for r in df["room"].unique().tolist() if r]):
         room_rows = df[df["room"] == rname]
         room_type_values = room_rows["room_type"].dropna().tolist()
-        is_lab = any(v == "lab" for v in room_type_values)
+        room_specs[rname] = any(v == "lab" for v in room_type_values)
 
+    for spec in _normalize_room_inventory(room_inventory):
+        name = spec["name"]
+        if not name:
+            continue
+        room_specs[name] = room_specs.get(name, False) or bool(spec.get("is_lab", False))
+
+    for rname in sorted(room_specs.keys()):
         room, created = Room.objects.get_or_create(
             name=rname,
-            defaults={"is_lab": is_lab},
+            defaults={"is_lab": room_specs[rname]},
         )
-        if not created and is_lab and not room.is_lab:
+        if not created and room_specs[rname] and not room.is_lab:
             room.is_lab = True
             room.save()
 
@@ -375,14 +446,20 @@ def _process_dataframe(df: pd.DataFrame) -> dict:
             if subj.id in seen_subjects:
                 continue
 
-            teacher = subject_teacher_map[subj.id]
+            teacher = row.get("teacher", "").strip()
+            teacher_obj = teacher_map.get(teacher)
+            if teacher_obj is None:
+                teacher_obj, _ = Teacher.objects.get_or_create(name=teacher)
+                teacher_map[teacher] = teacher_obj
+                teacher_limit_map[teacher_obj.id] = teacher_obj.max_hours_per_week
+
             room_name = row.get("room", "").strip()
             room_obj = room_map.get(room_name) if room_name else None
 
             items.append(
                 {
                     "subject_id": subj.id,
-                    "teacher_id": teacher.id,
+                    "teacher_id": teacher_obj.id,
                     "hours": int(subj.hours_per_week),
                     "type": subj.subject_type,
                     "room_id": room_obj.id if room_obj else None,

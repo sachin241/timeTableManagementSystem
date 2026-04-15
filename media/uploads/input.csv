@@ -1,9 +1,101 @@
-Sections,teacher,Subject,hours_per_week
-"5A,  5B",Dr. A.P.W.B. Dumbledore,Advanced Defense against Dark arts,4
-5C,Dr. Kingsley Shacklebolt,Advanced Defense against Dark arts,15
-5D,Dr. Alastor Moody,Advanced Defense against Dark arts,13
-5A,Dr. Nicholas Flamel,Advanced Potions and Alchemy,8
-"5B, 5C",Dr. Severus Snape,Advanced Potions and Alchemy,12
-5D,Dr. Horace Slughorn,Advanced Potions and Alchemy,4
-"5A,  5B",Dr. Minerva mcGonagall,Levitations and combinational spells,6
-"5C, 5D",Dr. A.P.W.B. Dumbledore,Levitations and combinational spells,4
+subject,teacher,hours_per_week,type,section
+Foundations of Magical Theory,Dr Rowena Ravenclaw,4,theory,Y1-A
+Magical Energy and Mana Systems,Dr Hermione Granger,4,theory,Y1-A
+Introduction to Wand Mechanics,Dr Septima Vector,3,theory,Y1-A
+History of Wizardry Sciences,Dr Miranda Goshawk,3,theory,Y1-A
+Spell Formation Principles,Cuthbert Binns,4,theory,Y1-A
+Magical Symbols and Runes,Dr Garrick Ollivander,4,theory,Y1-A
+Arcane Mathematics,Terry Boot,3,theory,Y1-A
+Foundations of Magical Theory,Dr Nicolas Flamel,4,theory,Y1-B
+Magical Energy and Mana Systems,Dr Bathilda Bagshot,4,theory,Y1-B
+Introduction to Wand Mechanics,Dr Honoria Nutcombe,3,theory,Y1-B
+History of Wizardry Sciences,Wilbert Slinkhard,3,theory,Y1-B
+Spell Formation Principles,Dr Hermione Granger,4,theory,Y1-B
+Magical Symbols and Runes,Luna Lovegood,4,theory,Y1-B
+Arcane Mathematics,Dr Newt Scamander,3,theory,Y1-B
+Magical Energy Manipulation,Anthony Goldstein,4,theory,Y2-A
+Wand Resonance and Core Theory,Michael Corner,3,theory,Y2-A
+Magical Systems Engineering,Padma Patil,4,theory,Y2-A
+Advanced Rune Architectures,Susan Bones,3,theory,Y2-A
+Unified Magical Field Theory,Dr Fleamont Potter,4,theory,Y2-A
+Principles of Object Levitation,Dr Minerva McGonagall,3,theory,Y2-A
+Introduction to Transfiguration,Dr Godric Gryffindor,4,theory,Y2-A
+Magical Energy Manipulation,Rose Weasley,4,theory,Y2-B
+Wand Resonance and Core Theory,Teddy Lupin,3,theory,Y2-B
+Magical Systems Engineering,Terry Boot,4,theory,Y2-B
+Advanced Rune Architectures,Anthony Goldstein,3,theory,Y2-B
+Unified Magical Field Theory,Michael Corner,4,theory,Y2-B
+Principles of Object Levitation,Dr Astoria Greengrass,3,theory,Y2-B
+Introduction to Transfiguration,Hannah Abbott,4,theory,Y2-B
+Basic Object Transformation,Dr Helga Hufflepuff,4,theory,Y3-A
+Living vs Non-Living Transfiguration,Dr Salazar Slytherin,4,theory,Y3-A
+Advanced Levitation Control,Dr Aurora Sinistra,3,theory,Y3-A
+Shape Alteration Magic,Dr Albus Dumbledore,3,theory,Y3-A
+Human Transfiguration Ethics,Angelina Johnson,3,theory,Y3-A
+Multi-Object Levitation,Alicia Spinnet,3,theory,Y3-A
+Complex Transformation Sequences,Katie Bell,3,theory,Y3-A
+Basic Object Transformation,Ernie Macmillan,4,theory,Y3-B
+Living vs Non-Living Transfiguration,Justin Finch-Fletchley,4,theory,Y3-B
+Advanced Levitation Control,Teddy Lupin,3,theory,Y3-B
+Shape Alteration Magic,Scorpius Malfoy,3,theory,Y3-B
+Human Transfiguration Ethics,Gregory Goyle,3,theory,Y3-B
+Multi-Object Levitation,Vincent Crabbe,3,theory,Y3-B
+Complex Transformation Sequences,Blaise Zabini,3,theory,Y3-B
+High-Level Transfiguration,Lavender Brown,4,theory,Y4-A
+Mass Levitation Systems,Parvati Patil,3,theory,Y4-A
+Temporal Transformation Theory,Dean Thomas,3,theory,Y4-A
+Transfiguration Mastery Practicum,Tilly Toke,2,lab,Y4-A
+Fundamentals of Defensive Magic,Dr Albus Dumbledore,4,theory,Y4-A
+Dark Creatures Identification,Dr Alastor Moody,4,theory,Y4-A
+Shield Charms and Barrier Magic,Dr Remus Lupin,3,theory,Y4-A
+High-Level Transfiguration,Pansy Parkinson,4,theory,Y4-B
+Mass Levitation Systems,Dr Viktor Krum,3,theory,Y4-B
+Temporal Transformation Theory,Colin Creevey,3,theory,Y4-B
+Transfiguration Mastery Practicum,Dr Viktor Krum,2,lab,Y4-B
+Fundamentals of Defensive Magic,Dr Gellert Grindelwald,4,theory,Y4-B
+Dark Creatures Identification,Dr Viktor Krum,4,theory,Y4-B
+Shield Charms and Barrier Magic,Dr Hermione Granger,3,theory,Y4-B
+Counter-Curses and Hex Reversal,Dr Kingsley Shacklebolt,3,theory,Y5-A
+Defensive Wand Techniques,Harry Potter,4,theory,Y5-A
+Combat Against Dark Wizards,Dr Rufus Scrimgeour,4,theory,Y5-A
+Advanced Patronus Charm,Nymphadora Tonks,3,theory,Y5-A
+Curse Detection and Neutralization,Dr Newt Scamander,3,theory,Y5-A
+Strategic Magical Defense,Dr Amelia Bones,4,theory,Y5-A
+Defensive Magic Field Practicum,Nymphadora Tonks,2,lab,Y5-A
+Counter-Curses and Hex Reversal,Luna Lovegood,3,theory,Y5-B
+Defensive Wand Techniques,Teddy Lupin,4,theory,Y5-B
+Combat Against Dark Wizards,Scorpius Malfoy,4,theory,Y5-B
+Advanced Patronus Charm,Gregory Goyle,3,theory,Y5-B
+Curse Detection and Neutralization,Vincent Crabbe,3,theory,Y5-B
+Strategic Magical Defense,Padma Patil,4,theory,Y5-B
+Defensive Magic Field Practicum,Dr Hermione Granger,2,lab,Y5-B
+Dark Artifact Containment,Cuthbert Binns,4,theory,Y6-A
+High-Level Dark Arts Countermeasures,Cedric Diggory,4,theory,Y6-A
+Introduction to Magical Potions,Dr Severus Snape,4,theory,Y6-A
+Potion Ingredients and Herbology Basics,Dr Horace Slughorn,3,theory,Y6-A
+Intermediate Potion Brewing,Dr Arsenius Jigger,4,theory,Y6-A
+Elixirs and Magical Liquids,Dr Libatius Borage,3,theory,Y6-A
+Toxicology of Magical Substances,Eirene Smethwyck,3,theory,Y6-A
+Alchemical Transformations,Dr Helga Hufflepuff,4,theory,Y6-A
+Dark Artifact Containment,Blaise Zabini,4,theory,Y6-B
+High-Level Dark Arts Countermeasures,Pansy Parkinson,4,theory,Y6-B
+Introduction to Magical Potions,Dr Hermione Granger,4,theory,Y6-B
+Potion Ingredients and Herbology Basics,Luna Lovegood,3,theory,Y6-B
+Intermediate Potion Brewing,Dr Newt Scamander,4,theory,Y6-B
+Elixirs and Magical Liquids,Rose Weasley,3,theory,Y6-B
+Toxicology of Magical Substances,Teddy Lupin,3,theory,Y6-B
+Alchemical Transformations,Lavender Brown,4,theory,Y6-B
+Healing and Restoration Potions,Dr Paracelsus,4,theory,Y7-A
+Potion Stability and Storage,Dr Vinda Rosier,3,theory,Y7-A
+Magical Catalyst Chemistry,Dr Honoria Nutcombe,3,theory,Y7-A
+Advanced Alchemical Synthesis,Dr Arsenius Jigger,4,theory,Y7-A
+Experimental Potion Engineering,Eirene Smethwyck,2,lab,Y7-A
+Legendary Elixirs and Rare Brews,Dr Miranda Goshawk,3,theory,Y7-A
+Master Alchemy Laboratory,Dr Nicolas Flamel,2,lab,Y7-A
+Healing and Restoration Potions,Dr Astoria Greengrass,4,theory,Y7-B
+Potion Stability and Storage,Hannah Abbott,3,theory,Y7-B
+Magical Catalyst Chemistry,Justin Finch-Fletchley,3,theory,Y7-B
+Advanced Alchemical Synthesis,Justin Finch-Fletchley,4,theory,Y7-B
+Experimental Potion Engineering,Luna Lovegood,2,lab,Y7-B
+Legendary Elixirs and Rare Brews,Dr Viktor Krum,3,theory,Y7-B
+Master Alchemy Laboratory,Dr Hermione Granger,2,lab,Y7-B
