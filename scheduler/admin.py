@@ -43,3 +43,8 @@ class TimetableAdmin(admin.ModelAdmin):
         reason = exp.get('reason', '—')
         return reason[:80] + '…' if len(reason) > 80 else reason
 
+
+
+from .models import Room
+
+admin.site.register(Room)
