@@ -129,3 +129,13 @@ class Timetable(models.Model):
     def __str__(self):
         tag = ' (cont.)' if self.is_lab_continuation else ''
         return f"[{self.section.name}] {self.time_slot} → {self.subject.name}{tag} ({self.teacher.name})"
+
+
+# Added model for Rooms 
+
+class Room(models.Model):
+    name = models.CharField(max_length=50)
+    is_lab = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
