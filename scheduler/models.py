@@ -1,18 +1,9 @@
-"""
-models.py — Database models for the AI Timetable Scheduler (v4).
+# models.py — Database models for the AI Timetable Scheduler (v4)
 
-v4 Changes:
-  - Timetable gains: explanation JSONField for per-slot reasoning metadata.
-
-Models:
-  - ClassSection: A class/branch (e.g. CSE-A).
-  - Subject: Academic subject with hours/credits and theory/lab type.
-  - Teacher: Teacher linked to subjects via M2M.
-  - TimeSlot: Time period on a weekday (generated programmatically).
-  - Timetable: Assignment of subject+teacher to slot+section + explanation.
-"""
+from uuid import uuid4
 
 from django.db import models
+from django.db.models import Q
 
 
 class ClassSection(models.Model):
@@ -20,7 +11,7 @@ class ClassSection(models.Model):
     name = models.CharField(max_length=50, unique=True)
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -28,65 +19,72 @@ class ClassSection(models.Model):
 
 class Subject(models.Model):
     """
-    Represents an academic subject.
+    Academic subject.
 
-    Subject type determines scheduling behavior:
-      - theory: Standard single-slot scheduling.
-      - lab: Requires consecutive multi-slot blocks.
+    subject_type:
+      - theory: standard single-slot scheduling
+      - lab: consecutive multi-slot scheduling
 
-    Credits system (optional):
-      - If credits is set and hours_per_week is 0, auto-calculate:
-          theory: 1 credit = 1 hour
-          lab:    1 credit = 2 hours
-      - If both are set, hours_per_week takes priority.
+    credits:
+      - optional input
+      - if hours_per_week is not set, save() can derive it from credits
     """
     SUBJECT_TYPES = [
-        ('theory', 'Theory'),
-        ('lab', 'Lab'),
+        ("theory", "Theory"),
+        ("lab", "Lab"),
     ]
 
     name = models.CharField(max_length=100, unique=True)
     hours_per_week = models.PositiveIntegerField(default=1)
-    credits = models.PositiveIntegerField(null=True, blank=True,
-                                          help_text="Optional. If provided without hours, auto-converts.")
-    subject_type = models.CharField(max_length=10, choices=SUBJECT_TYPES, default='theory')
+    credits = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional. If provided without hours, auto-converts.",
+    )
+    subject_type = models.CharField(
+        max_length=10,
+        choices=SUBJECT_TYPES,
+        default="theory",
+    )
 
     def save(self, *args, **kwargs):
-        """Auto-calculate hours_per_week from credits if not explicitly set."""
         if self.credits and (not self.hours_per_week or self.hours_per_week == 0):
-            if self.subject_type == 'lab':
-                self.hours_per_week = self.credits * 2
-            else:
-                self.hours_per_week = self.credits
+            self.hours_per_week = self.credits * 2 if self.subject_type == "lab" else self.credits
         super().save(*args, **kwargs)
 
     def __str__(self):
-        tag = ' [LAB]' if self.subject_type == 'lab' else ''
+        tag = " [LAB]" if self.subject_type == "lab" else ""
         return f"{self.name}{tag} ({self.hours_per_week}h/week)"
 
 
 class Teacher(models.Model):
     """Represents a teacher who can teach one or more subjects."""
     name = models.CharField(max_length=100, unique=True)
-    subjects = models.ManyToManyField(Subject, related_name='teachers')
-    max_hours_per_week = models.IntegerField(default=20)
+    subjects = models.ManyToManyField(Subject, related_name="teachers")
+    max_hours_per_week = models.PositiveIntegerField(default=20)
+
     def __str__(self):
         return self.name
 
 
+class Room(models.Model):
+    """Physical room or lab."""
+    name = models.CharField(max_length=50, unique=True)
+    is_lab = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
 
 class TimeSlot(models.Model):
-    """
-    Represents a time period on a specific weekday.
-    Generated programmatically by scheduler.generate_time_slots().
-    """
+    """Represents a time period on a specific weekday."""
     DAYS_OF_WEEK = [
-        ('Monday', 'Monday'),
-        ('Tuesday', 'Tuesday'),
-        ('Wednesday', 'Wednesday'),
-        ('Thursday', 'Thursday'),
-        ('Friday', 'Friday'),
-        ('Saturday', 'Saturday'),
+        ("Monday", "Monday"),
+        ("Tuesday", "Tuesday"),
+        ("Wednesday", "Wednesday"),
+        ("Thursday", "Thursday"),
+        ("Friday", "Friday"),
+        ("Saturday", "Saturday"),
     ]
 
     day = models.CharField(max_length=10, choices=DAYS_OF_WEEK)
@@ -95,44 +93,50 @@ class TimeSlot(models.Model):
     slot_index = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['day', 'slot_index']
-        unique_together = [('day', 'start_time', 'end_time')]
+        ordering = ["day", "slot_index"]
+        unique_together = [("day", "start_time", "end_time")]
 
     def __str__(self):
         return f"{self.day} {self.start_time.strftime('%H:%M')}–{self.end_time.strftime('%H:%M')}"
 
+
 class Timetable(models.Model):
+    """
+    A single scheduled class entry.
+    """
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
-    room = models.ForeignKey('Room', on_delete=models.CASCADE, null=True)  # NEW
-
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
-    section = models.ForeignKey(ClassSection, on_delete=models.CASCADE, related_name='timetable_entries')
+    section = models.ForeignKey(
+        ClassSection,
+        on_delete=models.CASCADE,
+        related_name="timetable_entries",
+    )
 
     is_lab_continuation = models.BooleanField(default=False)
-    lab_group_id = models.UUIDField(null=True, blank=True)  # OPTIONAL
-
+    lab_group_id = models.UUIDField(default=uuid4, null=True, blank=True)
     explanation = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ['section', 'time_slot']
-        unique_together = [('time_slot', 'section')]
-
+        ordering = ["section", "time_slot"]
+        unique_together = [("time_slot", "section")]
         constraints = [
             models.UniqueConstraint(
-                fields=['teacher', 'time_slot'],
-                name='unique_teacher_per_slot'
+                fields=["teacher", "time_slot"],
+                name="unique_teacher_per_slot",
             ),
             models.UniqueConstraint(
-                fields=['room', 'time_slot'],
-                name='unique_room_per_slot'
-            )
+                fields=["room", "time_slot"],
+                condition=Q(room__isnull=False),
+                name="unique_room_per_slot",
+            ),
         ]
-# Added model for Rooms 
-
-class Room(models.Model):
-    name = models.CharField(max_length=50)
-    is_lab = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.name
+        tag = " (cont.)" if self.is_lab_continuation else ""
+        room_txt = f" @ {self.room.name}" if self.room else ""
+        return (
+            f"[{self.section.name}] {self.time_slot} → "
+            f"{self.subject.name}{tag} ({self.teacher.name}){room_txt}"
+        )
