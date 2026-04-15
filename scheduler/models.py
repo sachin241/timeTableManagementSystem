@@ -69,9 +69,10 @@ class Teacher(models.Model):
     """Represents a teacher who can teach one or more subjects."""
     name = models.CharField(max_length=100, unique=True)
     subjects = models.ManyToManyField(Subject, related_name='teachers')
-
+    max_hours_per_week = models.IntegerField(default=20)
     def __str__(self):
         return self.name
+
 
 
 class TimeSlot(models.Model):
