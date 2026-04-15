@@ -101,37 +101,33 @@ class TimeSlot(models.Model):
     def __str__(self):
         return f"{self.day} {self.start_time.strftime('%H:%M')}–{self.end_time.strftime('%H:%M')}"
 
-
 class Timetable(models.Model):
-    """
-    Represents a single scheduled class entry.
-
-    DB-level constraints:
-      - (time_slot, section) must be unique → one subject per slot per section.
-
-    is_lab_continuation:
-      True for the 2nd, 3rd, ... slot of a multi-slot lab block.
-      The 1st slot of a lab block has is_lab_continuation=False.
-      This allows the UI to visually merge consecutive lab cells.
-    """
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
+    room = models.ForeignKey('Room', on_delete=models.CASCADE, null=True)  # NEW
+
     time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE)
     section = models.ForeignKey(ClassSection, on_delete=models.CASCADE, related_name='timetable_entries')
-    is_lab_continuation = models.BooleanField(default=False,
-        help_text="True for 2nd+ slots of a multi-slot lab block.")
-    explanation = models.JSONField(default=dict, blank=True,
-        help_text="Reasoning metadata: why this subject was placed in this slot.")
+
+    is_lab_continuation = models.BooleanField(default=False)
+    lab_group_id = models.UUIDField(null=True, blank=True)  # OPTIONAL
+
+    explanation = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ['section', 'time_slot']
         unique_together = [('time_slot', 'section')]
 
-    def __str__(self):
-        tag = ' (cont.)' if self.is_lab_continuation else ''
-        return f"[{self.section.name}] {self.time_slot} → {self.subject.name}{tag} ({self.teacher.name})"
-
-
+        constraints = [
+            models.UniqueConstraint(
+                fields=['teacher', 'time_slot'],
+                name='unique_teacher_per_slot'
+            ),
+            models.UniqueConstraint(
+                fields=['room', 'time_slot'],
+                name='unique_room_per_slot'
+            )
+        ]
 # Added model for Rooms 
 
 class Room(models.Model):
